@@ -1,0 +1,60 @@
+#!/bin/sh
+
+# Log into an OpenShift VM using the virtual serial console.
+# Issue some commands, expecting certain responses.
+# Then log out and close the virtual serial console.
+
+# The credentials to use to log into the VM
+user=centos
+pass=$(cat .password)
+# The name of the VM instance in OpenShift.
+# This must also be the VM's hostname, as known to the VM.
+host=tpmtest
+
+cat <<END_OF_EXPECT | exec /usr/bin/expect -d -f -
+set timeout -1
+exp_internal 1
+match_max 100000
+spawn virtctl console $host
+expect {
+	-exact {Successfully connected to $host console. The escape sequence is ^]}
+}
+send -- "\r"
+expect {
+	-exact {$host login: }
+}
+send -- "$user\n"
+expect {
+	-exact {$user}
+}
+expect {
+	-exact {Password: }
+}
+send -- "$pass\n"
+expect {
+	-re {Last login: .*}
+}
+expect {
+	-exact {[$user@$host ~]$ }
+}
+send -- "echo foo\n"
+expect {
+	-exact {echo foo}
+}
+expect {
+	-exact {foo}
+}
+expect {
+	-exact {[$user@$host ~]$ }
+}
+send -- "exit\n"
+expect {
+	-exact {exit}
+}
+expect {
+	-exact {logout}
+}
+# This sends the serial console's escape character control+]
+send -- "\x1d"
+expect eof
+END_OF_EXPECT
